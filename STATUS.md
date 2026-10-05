@@ -4,8 +4,8 @@ Printed by the `SessionStart` hook. **Only what a command verified goes here**; 
 under "Known debt". The harness self-test fails if the commit cited below is more than 25 commits
 behind HEAD.
 
-- **Last full gate:** pending — agent harness being installed, sobre `794c204`
-- **Verdict:** not yet run (`npm run gate`)
+- **Last full gate:** 2026-10-05, branch `chore/agent-harness`, sobre `8d1b8e9`
+- **Verdict:** GREEN (`npm run gate`: harness self-test · docs link-check · typecheck · tests (palette shape))
 
 ## Known debt
 
