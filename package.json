@@ -1,0 +1,26 @@
+{
+  "name": "@doctiling/brand",
+  "version": "0.1.0",
+  "description": "Doctiling design tokens (colors, typography, spacing) shared by the web app and the mobile app",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "gate": "sh scripts/gate.sh"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/doctiling/doctiling-brand.git"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "devDependencies": {
+    "typescript": "~5.9.2",
+    "vitest": "^4.1.8"
+  }
+}
