@@ -1,14 +1,19 @@
 # Constitution — doctiling-brand
 
-**Version 1.0.0** · Principles of the design-token package shared by doctiling-web and doctiling-mobile.
+**Version 2.0.0** · Principles of the design-token package shared by doctiling-web and doctiling-mobile.
 Every principle states its strength: **BLOCKING** names the command that fails; otherwise it is
 **REVIEW** (judged by the `reviewer` subagent and the human). Amendments bump the version, in their own
 commit.
 
+2.0.0 — the harness is now the config-driven [agent-harness](https://github.com/raalzate/agent-harness)
+(`scripts/gate.mjs`, `repo-lint`, `cycle-check`, `commit-msg`/`pre-push`); P7 and P8 added.
+
 ## P1 — Nothing ships without a green gate · BLOCKING
 
-*Mechanism:* `npm run gate` (`scripts/gate.sh`: harness self-test · docs link-check · typecheck ·
-tests), the `Stop` hook, and `.github/workflows/gate.yml` on every push, PR and `v*` tag.
+An **omitted** signal is not green.
+
+*Mechanism:* `npm run gate` (`scripts/gate.mjs`, signals in `.claude/harness.config.json`), the `Stop`
+hook (`.claude/hooks/gate-stop.mjs`), and `.github/workflows/ci.yml` on every push, PR and `v*` tag.
 
 ## P2 — Assertion integrity · REVIEW
 
@@ -36,6 +41,17 @@ Every change ships as a new `vX.Y.Z` tag with the `version` bumped; consumers pi
 
 *Mechanism:* `tests/brand-pin.test.ts` in doctiling-mobile (fails on a local copy or a moving branch).
 
-## P7 — Conduct on error · REVIEW
+## P7 — Protected paths · BLOCKING
+
+`.env*`, `package-lock.json` (agent only), `.git/` and `node_modules/` are not edited by the agent.
+
+*Mechanism:* `.claude/hooks/protected-paths.mjs` + `.githooks/pre-commit`.
+
+## P8 — Work is recorded and enters by PR · BLOCKING
+
+*Mechanism:* `.githooks/commit-msg` (`#N` or `no-issue: <why>` on code commits) and
+`.githooks/pre-push` (`main` only by pull request) + `scripts/cycle-check.mjs` (branch names).
+
+## P9 — Conduct on error · REVIEW
 
 Read the real output before retrying; after 2 failed attempts on the same error, stop and escalate.

@@ -1,28 +1,92 @@
 {
-  "$comment": "Single source of repo-specific knowledge for the hooks in .claude/hooks (generic, byte-identical across doctiling repos; checked by doctiling-workspace scripts/harness-drift.sh). Docs: docs/agent-harness.md.",
+  "$comment": "The ONLY repo-specific file of the harness. Hooks and scripts are generic copies of github.com/raalzate/agent-harness (list: doctiling-workspace scripts/harness-files.txt), byte-identical across the doctiling repos; doctiling-workspace `node scripts/harness-drift.mjs` fails otherwise. Docs: docs/arnes.md.",
   "gate": {
     "command": "npm run gate",
+    "fastCommand": "npm run gate:fast",
     "marker": ".git/gate-dirty",
-    "codePathPattern": "^(src|tests|scripts)/.*\\.(ts|mjs)$",
-    "postEdit": {
-      "command": [
-        "npx",
-        "tsc",
-        "--noEmit"
-      ],
-      "appendFile": false
-    }
+    "codeGlobs": [
+      "src/",
+      "tests/",
+      "scripts/",
+      ".claude/hooks/",
+      ".githooks/"
+    ],
+    "codeExtensions": [
+      ".ts",
+      ".mjs",
+      ".js",
+      ".sh"
+    ],
+    "installHooksCommand": "npm run hooks:install",
+    "signals": [
+      {
+        "name": "harness self-test",
+        "command": [
+          "node",
+          "scripts/harness-selftest.mjs"
+        ],
+        "why": "a broken hook, a rule that no longer bites or a config key pointing at nothing fail silently"
+      },
+      {
+        "name": "docs link-check",
+        "command": [
+          "node",
+          "scripts/docs-linkcheck.mjs"
+        ],
+        "why": "a doc pointer to a moved file sends the agent to read nothing"
+      },
+      {
+        "name": "convention lint",
+        "command": [
+          "node",
+          "scripts/repo-lint.mjs"
+        ],
+        "why": "the rules of this repo that no compiler sees, with a command that fails"
+      },
+      {
+        "name": "artifacts in place",
+        "command": [
+          "node",
+          "scripts/artifacts-check.mjs"
+        ],
+        "why": "specs live in doctiling-web; a plan loose in this public token package splits the record in two"
+      },
+      {
+        "name": "typecheck",
+        "command": [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        "why": "vitest transpiles per file and never type-checks"
+      },
+      {
+        "name": "tests (palette shape)",
+        "command": [
+          "npm",
+          "test"
+        ],
+        "why": "palette shape (same keys light/dark, 6-digit hex) — what consumers index into"
+      },
+      {
+        "name": "code index (codegraph)",
+        "command": [
+          "codegraph",
+          "status"
+        ],
+        "skipIfMissing": ".codegraph",
+        "why": "a stale index lies worse than none; OMITTED until someone runs `codegraph init` — omitted is not green"
+      },
+      {
+        "name": "harness cost (hook latency)",
+        "command": [
+          "node",
+          "scripts/hooks-timing.mjs"
+        ],
+        "why": "no other signal measures what the harness costs per prompt and per edit, and an expensive harness gets disabled whole"
+      }
+    ]
   },
-  "docs": {
-    "harness": "docs/agent-harness.md",
-    "status": "STATUS.md",
-    "gotchas": "docs/gotchas.md"
-  },
-  "ci": {
-    "workflow": ".github/workflows/gate.yml"
-  },
-  "hooksPath": ".githooks",
-  "hooksInstallCommand": "npm run hooks:install",
   "protectedPaths": [
     {
       "pattern": "(^|/)\\.env(\\.|$)",
@@ -34,26 +98,530 @@
       "reason": "package-lock.json is regenerated with `npx -y npm@10.8.2 install`, never edited by hand."
     },
     {
-      "pattern": "(^|/)\\.git/",
+      "pattern": "^\\.git/",
       "reason": "git history is not edited file by file."
+    },
+    {
+      "pattern": "^node_modules/",
+      "reason": "dependencies change through package.json + install."
+    },
+    {
+      "pattern": "^\\.codegraph/",
+      "reason": "the codegraph index is derived: rebuild it with `codegraph init`/`sync`."
     }
   ],
-  "bashRules": [
+  "bash": {
+    "deny": [
+      {
+        "pattern": "--no-ver[i]fy",
+        "reason": "skipping the verification hooks is forbidden. If the gate is in the way, fix the gate."
+      },
+      {
+        "pattern": "git\\s+push\\s+.*--force(?!-with-lease)",
+        "reason": "`--force` rewrites remote history. Use --force-with-lease and ask first."
+      },
+      {
+        "pattern": "git\\s+reset\\s+--hard",
+        "reason": "`reset --hard` destroys uncommitted work. Use `git stash` or ask first."
+      },
+      {
+        "pattern": "git\\s+add\\s+(\\.|-A|--all)(\\s|$)",
+        "reason": "`git add .` sweeps local state. Stage specific files."
+      },
+      {
+        "pattern": "\\bfind\\b[^|;&]*-delete",
+        "reason": "`find -delete` deletes without showing. Run the find without -delete and confirm the list."
+      },
+      {
+        "pattern": "\\bcurl\\b[^|;&]*\\|\\s*(ba)?sh",
+        "reason": "`curl | sh` runs remote code unread. Download the script, read it, then run it."
+      },
+      {
+        "pattern": "git\\s+clean\\s+-[a-z]*f",
+        "reason": "deletes untracked files. Dry-run first: `git clean -n`."
+      }
+    ],
+    "ask": [
+      {
+        "pattern": "git\\s+push\\s+.*--force-with-lease",
+        "reason": "rewrites remote history (with a safety net). Is the branch yours alone?"
+      },
+      {
+        "pattern": "git\\s+branch\\s+(-D|--delete\\s+--force)\\b",
+        "reason": "deletes the branch even if unmerged."
+      }
+    ]
+  },
+  "lint": {
+    "command": [
+      "node",
+      "scripts/repo-lint.mjs"
+    ],
+    "fileFlag": "--file"
+  },
+  "purity": [
     {
-      "pattern": "--no-verify",
-      "reason": "Skipping the verification hooks is forbidden. If the gate is in the way, fix the gate."
+      "dir": ".claude/hooks",
+      "forbiddenImports": [
+        "node:child_process",
+        "child_process"
+      ],
+      "except": [
+        ".claude/hooks/post-edit-check.mjs",
+        ".claude/hooks/session-start.mjs"
+      ],
+      "reason": "a hook that spawns processes costs latency on EVERY edit or prompt; the two exceptions are declared upstream (agent-harness)."
+    }
+  ],
+  "purityImportSyntax": [
+    "from\\s+['\"]{mod}['\"]",
+    "require\\(\\s*['\"]{mod}['\"]",
+    "import\\s+['\"]{mod}['\"]"
+  ],
+  "invariants": [
+    {
+      "file": ".github/workflows/ci.yml",
+      "required": [
+        "npm run gate"
+      ],
+      "forbidden": [
+        "continue-on-error: true"
+      ],
+      "reason": "CI verifies THE SAME deliverable as the human and the agent, on every push, PR and tag (P1): consumers pin tags."
     },
     {
-      "pattern": "git\\s+push\\s+[^\\n]*--force(?!-with-lease)",
-      "reason": "`git push --force` needs an explicit request from the human."
+      "file": ".githooks/pre-commit",
+      "required": [
+        "harness.config.json"
+      ],
+      "forbidden": [
+        "--config"
+      ],
+      "reason": "the pre-commit checks THIS repo config, never a permissive alternative."
+    }
+  ],
+  "tests": {
+    "filePattern": "(^|/)(__tests__|tests?)/|\\.(test|spec)\\.[cm]?[jt]sx?$",
+    "onlyPattern": "\\b(describe|it|test)\\.only\\("
+  },
+  "incidents": {
+    "file": "docs/gotchas.md",
+    "heading": "### GOTCHA",
+    "requiredLines": [
+      "Síntoma:",
+      "Causa:",
+      "Regla:",
+      "Mecanismo:"
+    ]
+  },
+  "docs": {
+    "proseRoots": [
+      "docs",
+      "scripts",
+      ".claude",
+      ".github",
+      ".githooks"
+    ],
+    "ignore": [
+      "node_modules",
+      ".git",
+      "dist",
+      "coverage",
+      ".codegraph"
+    ],
+    "ignoreFiles": [
+      "docs/buenas-practicas.md"
+    ],
+    "externalPaths": [],
+    "mentionSignals": [
+      "docs/arnes.md"
+    ],
+    "ignoreMarker": "linkcheck:ignore"
+  },
+  "status": {
+    "file": "STATUS.md",
+    "reminder": "Nothing ships without `npm run gate` green · every change ships as a new `vX.Y.Z` tag · lessons via `/lesson`."
+  },
+  "askFirst": {
+    "marker": ".git/agent-answer-first",
+    "questionPatterns": [
+      "^\\s*¿",
+      "\\?\\s*$",
+      "^\\s*(qu[eé]|por\\s?qu[eé]|c[oó]mo|cu[aá]l(es)?|cu[aá]ndo|d[oó]nde|qui[eé]n|para\\s?qu[eé])(?=\\s|$|[,:])",
+      "^\\s*(hay|existe|sirve|conviene|se puede|pod[eé]s|sab[eé]s|vale la pena)(?=\\s|$|[,:])"
+    ],
+    "actionPatterns": [
+      "\\b(arregl|corrig|implement|agreg|a[ñn]ad|cambi|escrib|cre[aá]|aplic|instal|port|actualiz|borr|elimin|quit|refactor|migr|public|commit|push|generá|genera|hacelo|haz|dale|proced|ajust)"
+    ],
+    "message": "Esto es una **pregunta**: contestala con lo que ya sabés o leyendo lo que haga falta. **No edites archivos del repo**: el hook `action-guard` los va a bloquear hasta el próximo pedido del humano.",
+    "pastPatterns": [
+      "\\b\\w+(aste|iste|aron|ieron|abas|amos|imos)(?=\\s|$|[,.?!])",
+      "\\b\\w+(ó|ió)(?=\\s|$|[,.?!])",
+      "\\b(hab[ií]as|hiciste|dejaste|qued[oó])(?=\\s|$|[,.?!])"
+    ],
+    "strongQuestionPatterns": [
+      "^\\s*¿",
+      "^\\s*(qu[eé]|por\\s?qu[eé]|c[oó]mo|cu[aá]l(es)?|cu[aá]ndo|d[oó]nde|qui[eé]n|para\\s?qu[eé])(?=\\s|$|[,:])"
+    ],
+    "directRequestPatterns": [
+      "\\b(pod[eé]s|puedes|podr[ií]as|te pido|por favor|necesito que|quiero que)\\b"
+    ]
+  },
+  "branches": {
+    "protected": [
+      "main"
+    ],
+    "reason": "work enters main by pull request with a green gate (every merge in the history is `Merge pull request #N`)."
+  },
+  "sdd": {
+    "kit": "sofka",
+    "skillRoots": [
+      "~/.claude/skills",
+      ".claude/skills"
+    ],
+    "phases": [],
+    "specsDir": "specs",
+    "activeFeaturePointer": "",
+    "routes": [
+      {
+        "route": "sdd",
+        "patterns": [
+          "\\bnueva (feature|funcionalidad|pantalla)\\b",
+          "\\b(feature|módulo|modulo) nuev[oa]\\b",
+          "\\bspec \\d{3}\\b"
+        ],
+        "message": "Feature-sized request → specs live in doctiling-web (web/specs/NNN-*). Here only token values change, mirrored from web globals.css (P3)."
+      },
+      {
+        "route": "cicd",
+        "patterns": [
+          "\\bpipeline\\b",
+          "\\bci/?cd\\b",
+          "\\bworkflow\\b",
+          "\\brelease\\b",
+          "\\bdeploy"
+        ],
+        "message": "Touches the pipeline: CI runs THE SAME `npm run gate` on every push, PR and `v*` tag; no step skips verification or tolerates a red gate."
+      },
+      {
+        "route": "harness",
+        "patterns": [
+          "\\bhook\\b",
+          "\\bgate\\b",
+          "\\barn[ée]s\\b",
+          "\\bharness\\b"
+        ],
+        "message": "Harness change → specifics go in `.claude/harness.config.json`. Generic files come from agent-harness upstream and change in EVERY doctiling repo in the same change (doctiling-workspace `node scripts/harness-drift.mjs`)."
+      },
+      {
+        "route": "none",
+        "patterns": [
+          "\\btypo\\b",
+          "\\bexplicame\\b",
+          "\\bqu[ée] hace\\b"
+        ],
+        "message": ""
+      }
+    ]
+  },
+  "tracker": {
+    "kind": "github",
+    "issuePattern": "(^|[^A-Za-z0-9_])#[0-9]+",
+    "issueExample": "#123 · Refs #123 · Closes #123",
+    "newIssueHint": [
+      "gh issue create --repo doctiling/doctiling-brand --title \"…\" --body \"…\""
+    ],
+    "artifactsIn": "tracker",
+    "specsDir": "specs",
+    "allowedInRepo": []
+  },
+  "commitMsg": {
+    "codePattern": "^(src/|tests/|scripts/|\\.claude/|\\.githooks/|\\.github/)",
+    "ignoreExtensions": [
+      ".md",
+      ".png",
+      ".jpg",
+      ".jpeg",
+      ".svg",
+      ".html"
+    ],
+    "skipSubjects": [
+      "Merge ",
+      "Revert ",
+      "fixup! ",
+      "squash! "
+    ],
+    "escapeLine": "no-issue:"
+  },
+  "workflow": {
+    "model": "github-flow",
+    "branchPattern": "^(feat|fix|docs|chore|refactor|test|ci|perf)/[a-z0-9][a-z0-9._-]*$",
+    "branchExamples": [
+      "chore/agent-harness",
+      "chore/port-agent-harness"
+    ],
+    "longLived": [
+      "main"
+    ],
+    "baseBranch": "main",
+    "mergeInto": [
+      {
+        "branch": ".*",
+        "into": [
+          "main"
+        ]
+      }
+    ],
+    "maxAgeDays": 5,
+    "staleAction": "warn",
+    "reason": "one short branch per change, named type/what — the convention the history already follows.",
+    "staleReason": "a branch not integrated for days is a big batch waiting."
+  },
+  "xp": {
+    "testFirst": {
+      "enabled": false,
+      "testPattern": "(^|/)(__tests__|tests?)/|\\.(test|spec)\\.[cm]?[jt]sx?$",
+      "escapeLine": "no-test:",
+      "reason": ""
     },
-    {
-      "pattern": "git\\s+reset\\s+--hard",
-      "reason": "`git reset --hard` destroys work: needs an explicit request from the human."
+    "smallBatch": {
+      "enabled": false,
+      "maxFiles": 30,
+      "maxLines": 900,
+      "escapeLine": "big-batch:",
+      "reason": ""
     },
+    "refactorSeparate": {
+      "enabled": false,
+      "subjectPattern": "^refactor(\\(|:)",
+      "escapeLine": "mixed-refactor:",
+      "reason": ""
+    },
+    "pairing": {
+      "enabled": false,
+      "trailer": "Co-authored-by:",
+      "escapeLine": "solo:",
+      "reason": ""
+    }
+  },
+  "graph": {
+    "tool": "codegraph",
+    "graphFile": ".codegraph/codegraph.db",
+    "queryCommand": "codegraph explore \"<pregunta>\"",
+    "panoramaCommand": "codegraph ui",
+    "statusCommand": "codegraph status",
+    "installHint": "curl -fsSL -o /tmp/codegraph-install.sh https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh  →  read it  →  sh /tmp/codegraph-install.sh  →  codegraph install  →  codegraph init",
+    "questionPatterns": [
+      "\\bqui[eé]n (llama|usa|importa|depende)",
+      "\\bradio de impacto\\b",
+      "\\bdependencia circular\\b"
+    ]
+  },
+  "observability": {
+    "budgetMs": 400,
+    "runs": 3,
+    "budgets": {
+      ".claude/hooks/post-edit-check.mjs": 900,
+      ".claude/hooks/session-start.mjs": 900
+    },
+    "probe": {
+      "filePath": "src/tokens.ts",
+      "command": "git status",
+      "prompt": "¿cómo está el arnés?"
+    },
+    "reason": "a slow hook is paid on EVERY turn; the budget turns «this will be slow» into a failing command.",
+    "stateFiles": [
+      ".git/gate-dirty",
+      ".git/agent-answer-first"
+    ]
+  },
+  "subagentOutput": {
+    "contracts": {
+      "reviewer": {
+        "mustMatch": "VEREDICTO:\\W*(rechazado|aprobado)",
+        "reason": "the main agent decides whether to ship on that line; without it, the review is an opinion."
+      },
+      "gate-runner": {
+        "mustMatch": "VEREDICTO:\\W*(VERDE|ROJO)",
+        "reason": "«nothing ships without a green gate» (P1) is decided on that line, not on a summary."
+      }
+    }
+  },
+  "coherence": {
+    "guides": [
+      "CLAUDE.md",
+      ".claude/commands",
+      ".claude/skills",
+      ".claude/agents"
+    ],
+    "commandPattern": "^(git|npm|npx|node|sh|gh|codegraph|find|curl|rm)\\s",
+    "configKeys": [
+      "reason",
+      "message",
+      "staleReason"
+    ],
+    "reason": "a guide recommending what a guard forbids leaves the agent in a retry loop."
+  },
+  "panel": {
+    "out": ".git/harness-panel",
+    "sources": {
+      "guide": "CLAUDE.md",
+      "constitutions": [
+        "CONSTITUTION.md"
+      ],
+      "manifest": "package.json",
+      "mechanismMarker": "*Mechanism:*"
+    },
+    "tasks": {
+      "manifest": "package.json",
+      "key": "scripts",
+      "invocation": "npm run"
+    },
+    "memory": {
+      "decisionsDir": "docs/decisions",
+      "runSessionHooks": true,
+      "promptSources": [
+        {
+          "hook": "sdd-router",
+          "key": "sdd.routes"
+        }
+      ]
+    }
+  },
+  "taxonomy": {
+    "stages": [
+      "sesión",
+      "pedido",
+      "acción decidida",
+      "edición hecha",
+      "fin del turno",
+      "commit",
+      "push",
+      "integración",
+      "continuo"
+    ],
+    "events": {
+      "SessionStart": {
+        "direction": "guía",
+        "stage": "sesión"
+      },
+      "UserPromptSubmit": {
+        "direction": "guía",
+        "stage": "pedido"
+      },
+      "PreToolUse": {
+        "direction": "freno",
+        "stage": "acción decidida"
+      },
+      "PostToolUse": {
+        "direction": "sensor",
+        "stage": "edición hecha"
+      },
+      "Stop": {
+        "direction": "sensor",
+        "stage": "fin del turno"
+      },
+      "SubagentStop": {
+        "direction": "sensor",
+        "stage": "fin del turno"
+      }
+    },
+    "gitHooksDir": ".githooks",
+    "gitHooks": {
+      "pre-commit": {
+        "direction": "sensor",
+        "stage": "commit"
+      },
+      "commit-msg": {
+        "direction": "sensor",
+        "stage": "commit"
+      },
+      "post-commit": {
+        "direction": "guía",
+        "stage": "commit"
+      },
+      "pre-push": {
+        "direction": "sensor",
+        "stage": "push"
+      }
+    },
+    "gateStages": [
+      "fin del turno",
+      "integración"
+    ],
+    "agents": {
+      "explorer": {
+        "direction": "guía",
+        "kind": "inferencial",
+        "stage": "pedido"
+      },
+      "reviewer": {
+        "direction": "sensor",
+        "kind": "inferencial",
+        "stage": "fin del turno"
+      },
+      "gate-runner": {
+        "direction": "sensor",
+        "kind": "computacional",
+        "stage": "fin del turno"
+      }
+    },
+    "guides": {
+      "CLAUDE.md": {
+        "stage": "sesión"
+      },
+      "CONSTITUTION.md": {
+        "stage": "sesión"
+      },
+      ".claude/commands": {
+        "stage": "pedido"
+      },
+      ".claude/skills": {
+        "stage": "pedido"
+      }
+    },
+    "pipelines": {
+      ".github/workflows/ci.yml": {
+        "stage": "integración"
+      },
+      ".github/workflows/drift.yml": {
+        "stage": "continuo"
+      }
+    }
+  },
+  "drift": {
+    "statusDatePattern": "Last full gate:\\W*(\\d{4}-\\d{2}-\\d{2})",
+    "statusMaxAgeDays": 14,
+    "historyCommits": 400,
+    "runner": ".github/workflows/drift.yml"
+  },
+  "install": {
+    "activators": {
+      ".claude/hooks/protected-paths.mjs": "protectedPaths",
+      ".claude/hooks/bash-guard.mjs": "bash.deny",
+      ".claude/hooks/reuse-guard.mjs": "reuse",
+      ".claude/hooks/post-edit-check.mjs": "lint.command",
+      ".claude/hooks/gate-stop.mjs": "gate.marker",
+      ".claude/hooks/subagent-contract.mjs": "subagentOutput.contracts",
+      ".claude/hooks/session-start.mjs": "status.file",
+      ".claude/hooks/sdd-router.mjs": "sdd.routes",
+      ".claude/hooks/graph-first.mjs": "graph.graphFile",
+      ".claude/hooks/ask-first.mjs": "askFirst.marker",
+      ".claude/hooks/action-guard.mjs": "askFirst.marker",
+      ".githooks/commit-msg": "commitMsg.codePattern",
+      ".githooks/pre-push": "branches.protected",
+      "scripts/cycle-check.mjs": "workflow.branchPattern",
+      "scripts/hooks-timing.mjs": "observability.budgetMs",
+      "scripts/harness-map.mjs": "taxonomy",
+      "scripts/drift-check.mjs": "drift"
+    }
+  },
+  "reuse": [
     {
-      "pattern": "git\\s+add\\s+(\\.|-A|--all)(\\s|$)",
-      "reason": "`git add .` sweeps local state. Stage specific files."
+      "pattern": "#[0-9a-fA-F]{6}\\b",
+      "appliesTo": "^src/(?!tokens\\.ts$)",
+      "reason": "the palette lives in `src/tokens.ts` (mirrored from web globals.css, P3); a hex literal anywhere else in src/ is a second palette consumers never see.",
+      "see": "src/tokens.ts"
     }
   ]
 }

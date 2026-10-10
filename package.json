@@ -7,8 +7,9 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "gate": "sh scripts/gate.sh",
-    "hooks:install": "git config core.hooksPath .githooks"
+    "gate": "node scripts/gate.mjs",
+    "hooks:install": "node scripts/hooks-install.mjs",
+    "gate:fast": "node scripts/gate.mjs fast"
   },
   "license": "SEE LICENSE IN LICENSE",
   "repository": {

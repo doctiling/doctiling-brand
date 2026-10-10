@@ -1,12 +1,13 @@
 # STATUS — verified state (doctiling-brand)
 
 Printed by the `SessionStart` hook. **Only what a command verified goes here**; what is assumed goes
-under "Known debt". The harness self-test fails if the commit cited below is more than 25 commits
-behind HEAD.
+under "Known debt".
 
-- **Last full gate:** 2026-10-05, branch `chore/agent-harness`, sobre `8d1b8e9`
-- **Verdict:** GREEN (`npm run gate`: harness self-test · docs link-check · typecheck · tests (palette shape))
+- **Last full gate:** 2026-10-10, branch `chore/port-agent-harness`
+- **Verdict:** GREEN (`npm run gate`: harness self-test · docs link-check · convention lint · artifacts in place · typecheck · tests (palette shape) · harness cost; code index OMITTED — no `.codegraph`)
 
 ## Known debt
 
-- See `docs/agent-harness.md` § Known debt.
+- See `docs/arnes.md` § What no machine verifies.
+- Code index (codegraph) not initialised: its gate signal is OMITTED (omitted is not green).
+- The upstream self-test does not run inside a git worktree (`.git` is a file there): gate from a real clone.
