@@ -18,7 +18,7 @@ Same definitions as <https://raalzate.github.io/agent-harness/>, scaled to a two
 ## Hooks
 
 Generic files, byte-identical with doctiling-web / -cli / -mobile (doctiling-workspace
-`scripts/harness-drift.sh` fails on drift); everything repo-specific is in `.claude/harness.config.json`.
+the workspace drift check (harness-drift) fails on drift); everything repo-specific is in `.claude/harness.config.json`.
 
 | Event | Hook | What it does |
 |---|---|---|
@@ -39,3 +39,7 @@ Generic files, byte-identical with doctiling-web / -cli / -mobile (doctiling-wor
 ## Known debt
 
 - P3 and P6 are enforced in the consumers (web, mobile), not here; this repo cannot see them.
+
+## Señales del gate (por nombre, como en `gate.signals` de `.claude/harness.config.json`)
+
+Desde el port a agent-harness `119695d` (2026-10-12) la definición del gate es la lista `gate.signals`: `scripts/gate.sh` es el wrapper genérico de `scripts/gate.mjs`, que corre cada señal como argv, sin shell, con su `why`. Señales: «harness self-test» · «docs link-check» · «convention lint» · «harness cost (hook latency)» · «typecheck» · «tests (palette shape)».
